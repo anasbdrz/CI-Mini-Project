@@ -1,0 +1,138 @@
+%% Initialization
+clearvars
+close all
+clc
+
+%% Load the Dataset
+filename = 'heart_attack_prediction_dataset.xlsx'; % specify your file name
+opts = detectImportOptions(filename);
+opts.VariableNamingRule = 'preserve';
+data = readtable(filename, opts);
+
+%% Extract Features and Target
+Age = data{:, 1};
+Cholesterol = data{:, 3};
+HeartRate = data{:, 5};
+StressLevel=data{:,15};
+Smoking=data{:, 8};
+FamilyHistory=data{:, 7};
+HeartDiseaseRisk = data{:, 22};
+
+% Select a subset of features for fuzzy logic
+fuzzyInputs = [Age Cholesterol HeartRate StressLevel Smoking FamilyHistory];
+
+% Original features for NN
+originalInputs = [Age Cholesterol HeartRate StressLevel Smoking FamilyHistory];
+
+% Target output
+output = HeartDiseaseRisk;
+
+%% Define Fuzzy Logic System
+fis = mamfis('Name', 'HeartRiskFIS');
+
+% Add inputs
+fis = addInput(fis, [0 100], 'Name', 'Age');
+fis = addInput(fis, [0 400], 'Name', 'Cholesterol');
+fis = addInput(fis, [0 200], 'Name', 'HeartRate');
+fis = addInput(fis, [0 10], 'Name', 'StressLevel');
+fis = addInput(fis, [0 1], 'Name', 'Smoking');
+fis = addInput(fis, [0 1], 'Name', 'FamilyHistory');
+
+% Add membership functions
+fis = addMF(fis, 'Age', 'trapmf', [0 0 30 50], 'Name', 'Young');
+fis = addMF(fis, 'Age', 'trapmf', [30 50 70 100], 'Name', 'Old');
+
+% Membership functions for Cholesterol
+fis = addMF(fis, 'Cholesterol', 'trimf', [0 100 200], 'Name', 'Normal');
+fis = addMF(fis, 'Cholesterol', 'trimf', [150 250 350], 'Name', 'Medium');
+fis = addMF(fis, 'Cholesterol', 'trimf', [300 400 400], 'Name', 'High');
+
+% Membership functions for HeartRate
+fis = addMF(fis, 'HeartRate', 'trimf', [0 50 60], 'Name', 'Low');
+fis = addMF(fis, 'HeartRate', 'trimf', [60 100 130], 'Name', 'Normal');
+fis = addMF(fis, 'HeartRate', 'trimf', [120 150 200], 'Name', 'High');
+
+% Membership functions for StressLevel (0-10)
+fis = addMF(fis, 'StressLevel', 'trapmf', [0 0 2 4], 'Name', 'Low');
+fis = addMF(fis, 'StressLevel', 'trapmf', [3 5 7 9], 'Name', 'Medium');
+fis = addMF(fis, 'StressLevel', 'trapmf', [8 10 10 10], 'Name', 'High');
+
+% Membership functions for Smoking (0 or 1)
+fis = addMF(fis, 'Smoking', 'trapmf', [0 0 0.5 1], 'Name', 'No');
+fis = addMF(fis, 'Smoking', 'trapmf', [0.5 1 1 1], 'Name', 'Yes');
+
+% Membership functions for FamilyHistory (0 or 1)
+fis = addMF(fis, 'FamilyHistory', 'trapmf', [0 0 0.5 1], 'Name', 'No');
+fis = addMF(fis, 'FamilyHistory', 'trapmf', [0.5 1 1 1], 'Name', 'Yes');
+
+
+% Add output
+fis = addOutput(fis, [0 1], 'Name', 'Risk');
+
+% Add output membership functions
+fis = addMF(fis, 'Risk', 'trimf', [0 0 0.5], 'Name', 'Low');
+fis = addMF(fis, 'Risk', 'trimf', [0.5 1 1], 'Name', 'High');
+
+% Add rules
+rules = [
+   "If Age is Young and Cholesterol is Normal and HeartRate is Low and StressLevel is Low and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Young and Cholesterol is Normal and HeartRate is Low and StressLevel is Medium and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Young and Cholesterol is Medium and HeartRate is Normal and StressLevel is Low and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Young and Cholesterol is Medium and HeartRate is Normal and StressLevel is Medium and Smoking is No and FamilyHistory is Yes then Risk is Low"
+    "If Age is Young and Cholesterol is Medium and HeartRate is High and StressLevel is High and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+    "If Age is Old and Cholesterol is High and HeartRate is Low and StressLevel is Low and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Old and Cholesterol is High and HeartRate is Normal and StressLevel is High and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+    "If Age is Old and Cholesterol is High and HeartRate is High and StressLevel is Medium and Smoking is No and FamilyHistory is Yes then Risk is High"
+    "If Age is Young and Cholesterol is Normal and HeartRate is Low and StressLevel is Low and Smoking is No and FamilyHistory is Yes then Risk is Low"
+    "If Age is Young and Cholesterol is High and HeartRate is Normal and StressLevel is Medium and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+    "If Age is Old and Cholesterol is Normal and HeartRate is High and StressLevel is High and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Old and Cholesterol is Medium and HeartRate is High and StressLevel is Medium and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+    "If Age is Old and Cholesterol is Normal and HeartRate is Low and StressLevel is Low and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Old and Cholesterol is Medium and HeartRate is Low and StressLevel is Medium and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+    "If Age is Young and Cholesterol is High and HeartRate is High and StressLevel is High and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+    "If Age is Young and Cholesterol is Normal and HeartRate is Normal and StressLevel is Low and Smoking is No and FamilyHistory is No then Risk is Low"
+    "If Age is Old and Cholesterol is Medium and HeartRate is Normal and StressLevel is Low and Smoking is No and FamilyHistory is Yes then Risk is Low"
+    "If Age is Young and Cholesterol is High and HeartRate is High and StressLevel is High and Smoking is No and FamilyHistory is Yes then Risk is High"
+    "If Age is Old and Cholesterol is Normal and HeartRate is Low and StressLevel is Medium and Smoking is No and FamilyHistory is Yes then Risk is Low"
+    "If Age is Old and Cholesterol is High and HeartRate is High and StressLevel is High and Smoking is Yes and FamilyHistory is Yes then Risk is High"
+];
+fis = addRule(fis, rules);
+
+
+%% Apply FIS to Data
+fuzzyOutputs = evalfis(fis,fuzzyInputs);
+
+% Augment features with fuzzy outputs
+augmentedInputs = [originalInputs fuzzyOutputs];
+
+%% Split Data into Training and Testing
+cv = cvpartition(size(augmentedInputs, 1), 'HoldOut', 0.3); % 30% for testing
+idx = cv.test;
+
+% Separate training and testing sets
+XTrain = augmentedInputs(~idx, :);
+YTrain = output(~idx);
+XTest = augmentedInputs(idx, :);
+YTest = output(idx);
+
+%% Data Standardization
+meanX = mean(XTrain);
+stdX = std(XTrain);
+XTrain = (XTrain - meanX) ./ stdX; % Standardize training data
+XTest = (XTest - meanX) ./ stdX;   % Standardize test data
+
+%% Train Neural Network
+hiddenLayerSizes = 10; % Adjust the number of neurons in hidden layer
+Mdl = fitcnet(XTrain, YTrain, 'LayerSizes', hiddenLayerSizes);
+
+%% Make Predictions and Evaluate
+YPred = predict(Mdl, XTest);
+
+% Evaluate performance
+accuracy = sum(YPred == YTest) / length(YTest) * 100;
+fprintf('Accuracy: %.2f%%\n', accuracy);
+confusionchart(YTest, YPred);
+
+save('modelParams.mat', 'Mdl', 'meanX', 'stdX', 'fis');
+
+
