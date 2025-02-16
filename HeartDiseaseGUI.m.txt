@@ -1,0 +1,113 @@
+function heartDiseaseGUI
+    % Create the main figure
+    fig = uifigure('Name', 'Heart Disease Risk Prediction', ...
+        'Position', [100 100 600 400]);
+   
+    
+    createLabel(fig, 'Age:', [50 300 100 22]);
+    ageField = createEditField(fig, [160 300 150 22]);
+    
+    createLabel(fig, 'HeartRate(0-200):', [50 250 100 22]);
+    heartRateField = createEditField(fig, [160 250 150 22]);
+    
+    createLabel(fig, 'Cholesterol(0-400):', [50 200 150 22]);
+    cholesterolField = createEditField(fig, [200 200 150 22]);
+    
+    createLabel(fig, 'StressLevel(0-10):', [50 50 100 22]);
+    stressField = createEditField(fig, [160 50 150 22]);
+
+    createLabel(fig, 'Smoking(0 or 1):', [50 100 100 22]);
+    smokingField = createEditField(fig, [160 100 150 22]);
+
+    createLabel(fig, 'FamilyHistory(0 or 1):', [50 150 150 22]);
+    familyField = createEditField(fig, [200 150 150 22]);
+    
+  
+    
+    % Create Result area
+    resultLabel = uilabel(fig, 'Position', [400 200 200 100], ...
+        'Text', 'Prediction will appear here...', ...
+        'WordWrap', 'on');
+    
+    % Create Predict button
+    predictBtn = uibutton(fig, 'Position', [400 150 100 30], ...
+        'Text', 'Predict', ...
+        'ButtonPushedFcn', @(btn,event) predictRisk());
+    
+    % Create Clear button
+    clearBtn = uibutton(fig, 'Position', [400 100 100 30], ...
+        'Text', 'Clear', ...
+        'ButtonPushedFcn', @(btn,event) clearFields());
+    
+    % Load the saved model and standardization parameters
+    % Note: You need to save these after training
+    % save('modelParams.mat', 'Mdl', 'meanX', 'stdX', 'fis');
+    modelData = load('modelParams.mat');
+    
+    function predictRisk()
+        try
+            % Get values from input fields
+            age = str2double(ageField.Value);
+            heartRate = str2double(heartRateField.Value);
+            cholesterol = str2double(cholesterolField.Value);
+            family = str2double(familyField.Value);
+            smoking = str2double(smokingField.Value);
+            stress = str2double(stressField.Value);
+            
+            % Input validation
+            if isnan(age) || isnan(heartRate) || isnan(cholesterol)
+                resultLabel.Text = 'Please enter valid numerical values';
+                return;
+            end
+            
+            % Prepare inputs for fuzzy inference
+            fuzzyInputs = [age cholesterol heartRate stress  smoking family];
+            
+            % Get fuzzy output
+            fuzzyOutput = evalfis(modelData.fis, fuzzyInputs);
+            
+            % Combine original and fuzzy features
+            features = [fuzzyInputs fuzzyOutput];
+            
+            % Standardize features
+            features = (features - modelData.meanX) ./ modelData.stdX;
+            
+            % Make prediction
+            prediction = predict(modelData.Mdl, features);
+            
+            % Display result
+            if prediction == 1
+                resultText = sprintf('High Risk!\nBased on the provided information, there is a significant risk of heart disease. Please consult a healthcare professional.');
+            else
+                resultText = sprintf('Low Risk.\nBased on the provided information, the risk of heart disease appears to be low. However, maintain a healthy lifestyle and regular check-ups.');
+            end
+            
+            resultLabel.Text = resultText;
+            
+        catch ME
+            resultLabel.Text = 'Error in prediction. Please check your inputs.';
+            disp(ME.message);
+        end
+    end
+    
+    function clearFields()
+        % Clear all input field
+        ageField.Value = '';
+        heartRateField.Value = '';
+        cholesterolField.Value = '';
+        familyField.Value = '';
+        smokingField.Value = '';
+        stressField.Value = '';
+        
+        resultLabel.Text = 'Prediction will appear here...';
+    end
+end
+
+function createLabel(fig, text, position)
+    uilabel(fig, 'Text', text, 'Position', position, ...
+        'HorizontalAlignment', 'right');
+end
+
+function field = createEditField(fig, position)
+    field = uieditfield(fig, 'Position', position);
+end
